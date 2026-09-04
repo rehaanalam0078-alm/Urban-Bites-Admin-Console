@@ -1,4 +1,4 @@
-﻿// ===== FIREBASE CONFIG =====
+// ===== FIREBASE CONFIG =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -33,6 +33,16 @@ let unsubOrders = null;
 let unsubMenu = null;
 
 // ===== UTILS =====
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const fmt = (paise) => '₹' + (paise / 100).toFixed(2);
 const fmtDate = (ts) => ts?.toDate ? ts.toDate().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
 const statusColors = {
@@ -48,7 +58,7 @@ const statusLabel = {
 };
 
 function statusBadge(s) {
-  return `<span class="status-badge status-${s}">${statusLabel[s] || s}</span>`;
+  return `<span class="status-badge status-${escapeHtml(s)}">${escapeHtml(statusLabel[s] || s)}</span>`;
 }
 
 function showToast(msg, type = '') {
@@ -108,7 +118,12 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ===== NAVIGATION =====
+let listenersInitialized = false;
+
 function initListeners() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', e => {
       e.preventDefault();
@@ -135,6 +150,152 @@ function initListeners() {
   document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
   document.getElementById('confirm-delete-btn').addEventListener('click', confirmDelete);
   document.getElementById('menu-form').addEventListener('submit', saveMenuItem);
+
+  // Event delegation: Orders table
+  const ordersBody = document.getElementById('orders-body');
+  if (ordersBody) {
+    ordersBody.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const orderId = button.dataset.orderId;
+      if (!orderId) return;
+
+      if (action === 'view-order') {
+        viewOrder(orderId);
+        return;
+      }
+
+      if (action === 'advance-order') {
+        if (button.disabled) return;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Updating…';
+        try {
+          await advanceOrder(orderId, button.dataset.currentStatus);
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+        return;
+      }
+
+      if (action === 'cancel-order') {
+        if (button.disabled) return;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Cancelling…';
+        try {
+          await cancelOrder(orderId);
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+        return;
+      }
+    });
+  }
+
+  // Event delegation: Order Modal actions
+  const modalStatusActions = document.getElementById('modal-status-actions');
+  if (modalStatusActions) {
+    modalStatusActions.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const orderId = button.dataset.orderId;
+      if (!orderId) return;
+
+      if (action === 'modal-advance') {
+        if (button.disabled) return;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Updating…';
+        try {
+          await advanceOrder(orderId, button.dataset.currentStatus);
+          closeOrderModal();
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+        return;
+      }
+
+      if (action === 'modal-cancel') {
+        if (button.disabled) return;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Cancelling…';
+        try {
+          await cancelOrder(orderId);
+          closeOrderModal();
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+        return;
+      }
+    });
+  }
+
+  // Event delegation: Menu table
+  const menuBody = document.getElementById('menu-body');
+  if (menuBody) {
+    menuBody.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const id = button.dataset.id;
+      if (!id) return;
+
+      switch (action) {
+        case 'toggle-availability':
+          if (button.dataset.busy === 'true') return;
+          button.dataset.busy = 'true';
+          try {
+            await toggleAvailable(id, button.dataset.current === 'true');
+          } finally {
+            button.dataset.busy = 'false';
+          }
+          break;
+
+        case 'edit-item':
+          editItem(id);
+          break;
+
+        case 'delete-item':
+          openDeleteModal(id, button.dataset.name || '');
+          break;
+      }
+    });
+  }
+
+  // Event delegation: Users table
+  const usersBody = document.getElementById('users-body');
+  if (usersBody) {
+    usersBody.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const userId = button.dataset.userId;
+      if (!userId || action !== 'set-admin') return;
+
+      if (button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Updating…';
+      try {
+        await setAdmin(userId, button.dataset.makeAdmin === 'true');
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
+  }
 }
 
 function loadPage(page) {
@@ -203,8 +364,8 @@ function renderRecentOrders() {
   if (!recent.length) { tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No orders yet</td></tr>'; return; }
   tbody.innerHTML = recent.map(o => `
     <tr>
-      <td><code style="font-size:0.8rem">#${(o.id || '').slice(0,8).toUpperCase()}</code></td>
-      <td>${o.userName || '—'}</td>
+      <td><code style="font-size:0.8rem">#${escapeHtml((o.id || '').slice(0,8).toUpperCase())}</code></td>
+      <td>${escapeHtml(o.userName || '—')}</td>
       <td>${fmt(o.total || 0)}</td>
       <td>${statusBadge(o.orderStatus)}</td>
     </tr>`).join('');
@@ -218,7 +379,7 @@ function renderStatusChart() {
   const chart = document.getElementById('status-chart');
   chart.innerHTML = Object.entries(counts).map(([k, v]) => `
     <div class="status-bar-item">
-      <div class="status-bar-label"><span>${statusLabel[k]}</span><span>${v}</span></div>
+      <div class="status-bar-label"><span>${escapeHtml(statusLabel[k])}</span><span>${v}</span></div>
       <div class="status-bar-track">
         <div class="status-bar-fill" style="width:${(v/total*100).toFixed(1)}%;background:${statusColors[k]}"></div>
       </div>
@@ -236,17 +397,17 @@ function renderOrders() {
   tbody.innerHTML = filtered.map(o => {
     const canAdvance = statusNext[o.orderStatus];
     return `<tr>
-      <td><code style="font-size:0.8rem">#${(o.id||'').slice(0,8).toUpperCase()}</code></td>
-      <td><div style="font-weight:600">${o.userName||'—'}</div><div style="font-size:0.78rem;color:#888">${o.userPhone||''}</div></td>
+      <td><code style="font-size:0.8rem">#${escapeHtml((o.id||'').slice(0,8).toUpperCase())}</code></td>
+      <td><div style="font-weight:600">${escapeHtml(o.userName||'—')}</div><div style="font-size:0.78rem;color:#888">${escapeHtml(o.userPhone||'')}</div></td>
       <td>${(o.items||[]).length} item${(o.items||[]).length !== 1 ? 's' : ''}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
-      <td><span style="font-size:0.8rem">${(o.paymentMethod||'').replace('_',' ')}</span></td>
+      <td><span style="font-size:0.8rem">${escapeHtml((o.paymentMethod||'').replace('_',' '))}</span></td>
       <td>${statusBadge(o.orderStatus)}</td>
       <td style="font-size:0.8rem;color:#888">${fmtDate(o.createdAt)}</td>
       <td><div class="actions-cell">
-        <button class="action-btn action-view" onclick="viewOrder('${o.id}')">View</button>
-        ${canAdvance ? `<button class="action-btn action-advance" onclick="advanceOrder('${o.id}','${o.orderStatus}')">→ ${statusLabel[canAdvance]}</button>` : ''}
-        ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="action-btn action-delete" onclick="cancelOrder('${o.id}')">Cancel</button>` : ''}
+        <button class="action-btn action-view" data-action="view-order" data-order-id="${escapeHtml(o.id)}">View</button>
+        ${canAdvance ? `<button class="action-btn action-advance" data-action="advance-order" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(o.orderStatus)}">→ ${escapeHtml(statusLabel[canAdvance])}</button>` : ''}
+        ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="action-btn action-delete" data-action="cancel-order" data-order-id="${escapeHtml(o.id)}">Cancel</button>` : ''}
       </div></td>
     </tr>`;
   }).join('');
@@ -258,18 +419,18 @@ function viewOrder(id) {
   document.getElementById('modal-order-title').textContent = `Order #${id.slice(0,8).toUpperCase()}`;
   const itemsHtml = (o.items || []).map(i => `
     <tr>
-      <td>${i.name}</td>
-      <td style="text-align:center">${i.quantity}</td>
+      <td>${escapeHtml(i.name || '')}</td>
+      <td style="text-align:center">${escapeHtml(i.quantity != null ? i.quantity : 1)}</td>
       <td style="text-align:right">${fmt(i.subtotal||0)}</td>
     </tr>`).join('');
   document.getElementById('modal-order-content').innerHTML = `
     <div class="order-detail-body">
       <div class="order-meta-grid">
-        <div class="order-meta-item"><label>Customer</label><span>${o.userName||'—'}</span></div>
-        <div class="order-meta-item"><label>Phone</label><span>${o.userPhone||'—'}</span></div>
+        <div class="order-meta-item"><label>Customer</label><span>${escapeHtml(o.userName||'—')}</span></div>
+        <div class="order-meta-item"><label>Phone</label><span>${escapeHtml(o.userPhone||'—')}</span></div>
         <div class="order-meta-item"><label>Status</label><span>${statusBadge(o.orderStatus)}</span></div>
-        <div class="order-meta-item"><label>Payment</label><span>${(o.paymentMethod||'').replace('_',' ')} — ${o.paymentStatus||''}</span></div>
-        <div class="order-meta-item"><label>Address</label><span>${o.deliveryAddress||'—'}</span></div>
+        <div class="order-meta-item"><label>Payment</label><span>${escapeHtml((o.paymentMethod||'').replace('_',' '))} — ${escapeHtml(o.paymentStatus||'')}</span></div>
+        <div class="order-meta-item"><label>Address</label><span>${escapeHtml(o.deliveryAddress||'—')}</span></div>
         <div class="order-meta-item"><label>Ordered</label><span>${fmtDate(o.createdAt)}</span></div>
       </div>
       <table class="order-items-table">
@@ -286,8 +447,8 @@ function viewOrder(id) {
   const actions = document.getElementById('modal-status-actions');
   const canAdv = statusNext[o.orderStatus];
   actions.innerHTML = `
-    ${canAdv ? `<button class="btn-primary" onclick="advanceOrder('${o.id}','${o.orderStatus}');closeOrderModal()">→ Mark as ${statusLabel[canAdv]}</button>` : ''}
-    ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="btn-danger" onclick="cancelOrder('${o.id}');closeOrderModal()">Cancel Order</button>` : ''}`;
+    ${canAdv ? `<button class="btn-primary" data-action="modal-advance" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(o.orderStatus)}">→ Mark as ${escapeHtml(statusLabel[canAdv])}</button>` : ''}
+    ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="btn-danger" data-action="modal-cancel" data-order-id="${escapeHtml(o.id)}">Cancel Order</button>` : ''}`;
   document.getElementById('order-modal').classList.remove('hidden');
 }
 
@@ -316,11 +477,11 @@ function populateCategoryFilter() {
   const cats = [...new Set(allMenuItems.map(m => m.categoryName).filter(Boolean))].sort();
   const sel = document.getElementById('menu-category-filter');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   sel.value = cur;
   // datalist
   const dl = document.getElementById('category-list');
-  if (dl) dl.innerHTML = cats.map(c => `<option value="${c}">`).join('');
+  if (dl) dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
 }
 
 function filterMenu() {
@@ -340,18 +501,18 @@ function renderMenuTable(items) {
   if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No menu items found</td></tr>'; return; }
   tbody.innerHTML = items.map(m => `
     <tr>
-      <td>${m.imageUrl ? `<img class="food-thumb" src="${m.imageUrl}" alt="${m.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="food-thumb-placeholder" style="display:none">🍽️</div>` : '<div class="food-thumb-placeholder">🍽️</div>'}</td>
-      <td><div style="font-weight:600">${m.name}</div><div style="font-size:0.78rem;color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.description||''}</div></td>
-      <td><span style="font-size:0.8rem;background:#f0f1f2;padding:0.2rem 0.6rem;border-radius:50px">${m.categoryName||'—'}</span></td>
+      <td>${m.imageUrl ? `<img class="food-thumb" src="${escapeHtml(m.imageUrl)}" alt="${escapeHtml(m.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="food-thumb-placeholder" style="display:none">🍽️</div>` : '<div class="food-thumb-placeholder">🍽️</div>'}</td>
+      <td><div style="font-weight:600">${escapeHtml(m.name)}</div><div style="font-size:0.78rem;color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(m.description||'')}</div></td>
+      <td><span style="font-size:0.8rem;background:#f0f1f2;padding:0.2rem 0.6rem;border-radius:50px">${escapeHtml(m.categoryName||'—')}</span></td>
       <td>
         <div style="font-weight:700">${fmt(m.discountPrice && m.discountPrice < m.price ? m.discountPrice : m.price)}</div>
         ${m.discountPrice && m.discountPrice < m.price ? `<div style="font-size:0.75rem;color:#888;text-decoration:line-through">${fmt(m.price)}</div>` : ''}
       </td>
-      <td><span class="toggle-available" onclick="toggleAvailable('${m.id}',${m.isAvailable})" title="Toggle availability">${m.isAvailable ? '✅' : '❌'}</span></td>
+      <td><span class="toggle-available" role="button" tabindex="0" data-action="toggle-availability" data-id="${escapeHtml(m.id)}" data-current="${m.isAvailable ? 'true' : 'false'}" title="Toggle availability">${m.isAvailable ? '✅' : '❌'}</span></td>
       <td>${m.isFeatured ? '⭐' : '—'}</td>
       <td><div class="actions-cell">
-        <button class="action-btn action-edit" onclick="editItem('${m.id}')">Edit</button>
-        <button class="action-btn action-delete" onclick="openDeleteModal('${m.id}','${m.name.replace(/'/g,"\\'")}')">Delete</button>
+        <button class="action-btn action-edit" data-action="edit-item" data-id="${escapeHtml(m.id)}">Edit</button>
+        <button class="action-btn action-delete" data-action="delete-item" data-id="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">Delete</button>
       </div></td>
     </tr>`).join('');
 }
@@ -432,13 +593,22 @@ function openDeleteModal(id, name) {
   document.getElementById('delete-modal').classList.remove('hidden');
 }
 function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); deletingItemId = null; }
+
+let isDeletingItem = false;
 async function confirmDelete() {
-  if (!deletingItemId) return;
+  if (!deletingItemId || isDeletingItem) return;
+  isDeletingItem = true;
+  const btn = document.getElementById('confirm-delete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
   try {
     await deleteDoc(doc(db, 'menuItems', deletingItemId));
     showToast('Item deleted', 'success');
     closeDeleteModal();
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  finally {
+    isDeletingItem = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
+  }
 }
 
 // ===== USERS PAGE =====
@@ -451,16 +621,16 @@ async function loadUsers() {
     if (!allUsers.length) { tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No users found</td></tr>'; return; }
     tbody.innerHTML = allUsers.map(u => `
       <tr>
-        <td><div style="font-weight:600">${u.name||'—'}</div></td>
-        <td>${u.email||'—'}</td>
-        <td>${u.phone||'—'}</td>
-        <td><span class="role-badge role-${u.role||'customer'}">${u.role||'customer'}</span></td>
+        <td><div style="font-weight:600">${escapeHtml(u.name||'—')}</div></td>
+        <td>${escapeHtml(u.email||'—')}</td>
+        <td>${escapeHtml(u.phone||'—')}</td>
+        <td><span class="role-badge role-${escapeHtml(u.role||'customer')}">${escapeHtml(u.role||'customer')}</span></td>
         <td style="font-size:0.8rem;color:#888">${fmtDate(u.createdAt)}</td>
         <td>
-          ${u.role !== 'admin' ? `<button class="action-btn action-edit" onclick="setAdmin('${u.id}',true)">Make Admin</button>` : `<button class="action-btn action-delete" onclick="setAdmin('${u.id}',false)">Revoke Admin</button>`}
+          ${u.role !== 'admin' ? `<button class="action-btn action-edit" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="true">Make Admin</button>` : `<button class="action-btn action-delete" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="false">Revoke Admin</button>`}
         </td>
       </tr>`).join('');
-  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Error: ${e.message}</td></tr>`; }
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Error: ${escapeHtml(e.message)}</td></tr>`; }
 }
 
 async function setAdmin(uid, makeAdmin) {
