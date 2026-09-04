@@ -117,7 +117,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// ===== NAVIGATION =====
+// ===== NAVIGATION & EVENT HANDLING =====
 let listenersInitialized = false;
 
 function initListeners() {
@@ -133,158 +133,127 @@ function initListeners() {
   document.querySelectorAll('.btn-link[data-page]').forEach(btn => {
     btn.addEventListener('click', () => loadPage(btn.dataset.page));
   });
-  document.getElementById('order-status-filter').addEventListener('change', renderOrders);
-  document.getElementById('menu-search').addEventListener('input', filterMenu);
-  document.getElementById('menu-category-filter').addEventListener('change', filterMenu);
-  document.getElementById('add-item-btn').addEventListener('click', () => openMenuModal());
+  document.getElementById('order-status-filter')?.addEventListener('change', renderOrders);
+  document.getElementById('menu-search')?.addEventListener('input', filterMenu);
+  document.getElementById('menu-category-filter')?.addEventListener('change', filterMenu);
+  document.getElementById('add-item-btn')?.addEventListener('click', () => openMenuModal());
 
   // modal close buttons
-  document.getElementById('order-backdrop').addEventListener('click', closeOrderModal);
-  document.getElementById('close-order-modal').addEventListener('click', closeOrderModal);
-  document.getElementById('close-order-btn').addEventListener('click', closeOrderModal);
-  document.getElementById('menu-backdrop').addEventListener('click', closeMenuModal);
-  document.getElementById('close-menu-modal').addEventListener('click', closeMenuModal);
-  document.getElementById('cancel-menu-btn').addEventListener('click', closeMenuModal);
-  document.getElementById('delete-backdrop').addEventListener('click', closeDeleteModal);
-  document.getElementById('close-delete-modal').addEventListener('click', closeDeleteModal);
-  document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
-  document.getElementById('confirm-delete-btn').addEventListener('click', confirmDelete);
-  document.getElementById('menu-form').addEventListener('submit', saveMenuItem);
+  document.getElementById('order-backdrop')?.addEventListener('click', closeOrderModal);
+  document.getElementById('close-order-modal')?.addEventListener('click', closeOrderModal);
+  document.getElementById('close-order-btn')?.addEventListener('click', closeOrderModal);
+  document.getElementById('menu-backdrop')?.addEventListener('click', closeMenuModal);
+  document.getElementById('close-menu-modal')?.addEventListener('click', closeMenuModal);
+  document.getElementById('cancel-menu-btn')?.addEventListener('click', closeMenuModal);
+  document.getElementById('delete-backdrop')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('close-delete-modal')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('cancel-delete-btn')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('confirm-delete-btn')?.addEventListener('click', confirmDelete);
+  document.getElementById('menu-form')?.addEventListener('submit', saveMenuItem);
 
-  // Event delegation: Orders table
-  const ordersBody = document.getElementById('orders-body');
-  if (ordersBody) {
-    ordersBody.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-action]');
-      if (!button) return;
+  // Global event delegation for all [data-action] buttons
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-action]');
+    if (!button) return;
 
-      const action = button.dataset.action;
+    const action = button.dataset.action;
+    if (!action) return;
+
+    if (action === 'view-order') {
       const orderId = button.dataset.orderId;
-      if (!orderId) return;
+      if (orderId) viewOrder(orderId);
+      return;
+    }
 
-      if (action === 'view-order') {
-        viewOrder(orderId);
-        return;
-      }
-
-      if (action === 'advance-order') {
-        if (button.disabled) return;
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = 'Updating…';
-        try {
-          await advanceOrder(orderId, button.dataset.currentStatus);
-        } finally {
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-        return;
-      }
-
-      if (action === 'cancel-order') {
-        if (button.disabled) return;
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = 'Cancelling…';
-        try {
-          await cancelOrder(orderId);
-        } finally {
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-        return;
-      }
-    });
-  }
-
-  // Event delegation: Order Modal actions
-  const modalStatusActions = document.getElementById('modal-status-actions');
-  if (modalStatusActions) {
-    modalStatusActions.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-action]');
-      if (!button) return;
-
-      const action = button.dataset.action;
+    if (action === 'advance-order') {
       const orderId = button.dataset.orderId;
-      if (!orderId) return;
-
-      if (action === 'modal-advance') {
-        if (button.disabled) return;
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = 'Updating…';
-        try {
-          await advanceOrder(orderId, button.dataset.currentStatus);
-          closeOrderModal();
-        } finally {
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-        return;
+      if (!orderId || button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Updating…';
+      try {
+        await advanceOrder(orderId, button.dataset.currentStatus);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
       }
+      return;
+    }
 
-      if (action === 'modal-cancel') {
-        if (button.disabled) return;
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = 'Cancelling…';
-        try {
-          await cancelOrder(orderId);
-          closeOrderModal();
-        } finally {
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-        return;
+    if (action === 'cancel-order') {
+      const orderId = button.dataset.orderId;
+      if (!orderId || button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Cancelling…';
+      try {
+        await cancelOrder(orderId);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
       }
-    });
-  }
+      return;
+    }
 
-  // Event delegation: Menu table
-  const menuBody = document.getElementById('menu-body');
-  if (menuBody) {
-    menuBody.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-action]');
-      if (!button) return;
+    if (action === 'modal-advance') {
+      const orderId = button.dataset.orderId;
+      if (!orderId || button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Updating…';
+      try {
+        await advanceOrder(orderId, button.dataset.currentStatus);
+        closeOrderModal();
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+      return;
+    }
 
-      const action = button.dataset.action;
+    if (action === 'modal-cancel') {
+      const orderId = button.dataset.orderId;
+      if (!orderId || button.disabled) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Cancelling…';
+      try {
+        await cancelOrder(orderId);
+        closeOrderModal();
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+      return;
+    }
+
+    if (action === 'toggle-availability') {
       const id = button.dataset.id;
-      if (!id) return;
-
-      switch (action) {
-        case 'toggle-availability':
-          if (button.dataset.busy === 'true') return;
-          button.dataset.busy = 'true';
-          try {
-            await toggleAvailable(id, button.dataset.current === 'true');
-          } finally {
-            button.dataset.busy = 'false';
-          }
-          break;
-
-        case 'edit-item':
-          editItem(id);
-          break;
-
-        case 'delete-item':
-          openDeleteModal(id, button.dataset.name || '');
-          break;
+      if (!id || button.dataset.busy === 'true') return;
+      button.dataset.busy = 'true';
+      try {
+        await toggleAvailable(id, button.dataset.current === 'true');
+      } finally {
+        button.dataset.busy = 'false';
       }
-    });
-  }
+      return;
+    }
 
-  // Event delegation: Users table
-  const usersBody = document.getElementById('users-body');
-  if (usersBody) {
-    usersBody.addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-action]');
-      if (!button) return;
+    if (action === 'edit-item') {
+      const id = button.dataset.id;
+      if (id) editItem(id);
+      return;
+    }
 
-      const action = button.dataset.action;
+    if (action === 'delete-item') {
+      const id = button.dataset.id;
+      if (id) openDeleteModal(id, button.dataset.name || '');
+      return;
+    }
+
+    if (action === 'set-admin') {
       const userId = button.dataset.userId;
-      if (!userId || action !== 'set-admin') return;
-
-      if (button.disabled) return;
+      if (!userId || button.disabled) return;
       button.disabled = true;
       const originalText = button.textContent;
       button.textContent = 'Updating…';
@@ -294,8 +263,9 @@ function initListeners() {
         button.disabled = false;
         button.textContent = originalText;
       }
-    });
-  }
+      return;
+    }
+  });
 }
 
 function loadPage(page) {
@@ -390,31 +360,33 @@ function renderStatusChart() {
 function loadOrders() { subscribeOrders(); renderOrders(); }
 
 function renderOrders() {
-  const filter = document.getElementById('order-status-filter').value;
-  const filtered = filter ? allOrders.filter(o => o.orderStatus === filter) : allOrders;
+  const filter = document.getElementById('order-status-filter')?.value || '';
+  const filtered = filter ? allOrders.filter(o => (o.orderStatus || '').toUpperCase() === filter.toUpperCase()) : allOrders;
   const tbody = document.getElementById('orders-body');
+  if (!tbody) return;
   if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No orders found</td></tr>'; return; }
   tbody.innerHTML = filtered.map(o => {
-    const canAdvance = statusNext[o.orderStatus];
+    const rawStatus = (o.orderStatus || '').toUpperCase();
+    const canAdvance = statusNext[rawStatus] || statusNext[o.orderStatus];
     return `<tr>
       <td><code style="font-size:0.8rem">#${escapeHtml((o.id||'').slice(0,8).toUpperCase())}</code></td>
       <td><div style="font-weight:600">${escapeHtml(o.userName||'—')}</div><div style="font-size:0.78rem;color:#888">${escapeHtml(o.userPhone||'')}</div></td>
       <td>${(o.items||[]).length} item${(o.items||[]).length !== 1 ? 's' : ''}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
       <td><span style="font-size:0.8rem">${escapeHtml((o.paymentMethod||'').replace('_',' '))}</span></td>
-      <td>${statusBadge(o.orderStatus)}</td>
+      <td>${statusBadge(rawStatus || o.orderStatus)}</td>
       <td style="font-size:0.8rem;color:#888">${fmtDate(o.createdAt)}</td>
       <td><div class="actions-cell">
-        <button class="action-btn action-view" data-action="view-order" data-order-id="${escapeHtml(o.id)}">View</button>
-        ${canAdvance ? `<button class="action-btn action-advance" data-action="advance-order" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(o.orderStatus)}">→ ${escapeHtml(statusLabel[canAdvance])}</button>` : ''}
-        ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="action-btn action-delete" data-action="cancel-order" data-order-id="${escapeHtml(o.id)}">Cancel</button>` : ''}
+        <button type="button" class="action-btn action-view" data-action="view-order" data-order-id="${escapeHtml(o.id)}">View</button>
+        ${canAdvance ? `<button type="button" class="action-btn action-advance" data-action="advance-order" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(rawStatus || o.orderStatus)}">→ ${escapeHtml(statusLabel[canAdvance] || canAdvance)}</button>` : ''}
+        ${rawStatus !== 'CANCELLED' && rawStatus !== 'DELIVERED' ? `<button type="button" class="action-btn action-delete" data-action="cancel-order" data-order-id="${escapeHtml(o.id)}">Cancel</button>` : ''}
       </div></td>
     </tr>`;
   }).join('');
 }
 
 function viewOrder(id) {
-  const o = allOrders.find(x => x.id === id);
+  const o = allOrders.find(x => String(x.id) === String(id));
   if (!o) return;
   document.getElementById('modal-order-title').textContent = `Order #${id.slice(0,8).toUpperCase()}`;
   const itemsHtml = (o.items || []).map(i => `
@@ -428,7 +400,7 @@ function viewOrder(id) {
       <div class="order-meta-grid">
         <div class="order-meta-item"><label>Customer</label><span>${escapeHtml(o.userName||'—')}</span></div>
         <div class="order-meta-item"><label>Phone</label><span>${escapeHtml(o.userPhone||'—')}</span></div>
-        <div class="order-meta-item"><label>Status</label><span>${statusBadge(o.orderStatus)}</span></div>
+        <div class="order-meta-item"><label>Status</label><span>${statusBadge((o.orderStatus||'').toUpperCase() || o.orderStatus)}</span></div>
         <div class="order-meta-item"><label>Payment</label><span>${escapeHtml((o.paymentMethod||'').replace('_',' '))} — ${escapeHtml(o.paymentStatus||'')}</span></div>
         <div class="order-meta-item"><label>Address</label><span>${escapeHtml(o.deliveryAddress||'—')}</span></div>
         <div class="order-meta-item"><label>Ordered</label><span>${fmtDate(o.createdAt)}</span></div>
@@ -445,21 +417,23 @@ function viewOrder(id) {
       </div>
     </div>`;
   const actions = document.getElementById('modal-status-actions');
-  const canAdv = statusNext[o.orderStatus];
+  const rawStatus = (o.orderStatus || '').toUpperCase();
+  const canAdv = statusNext[rawStatus] || statusNext[o.orderStatus];
   actions.innerHTML = `
-    ${canAdv ? `<button class="btn-primary" data-action="modal-advance" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(o.orderStatus)}">→ Mark as ${escapeHtml(statusLabel[canAdv])}</button>` : ''}
-    ${o.orderStatus !== 'CANCELLED' && o.orderStatus !== 'DELIVERED' ? `<button class="btn-danger" data-action="modal-cancel" data-order-id="${escapeHtml(o.id)}">Cancel Order</button>` : ''}`;
+    ${canAdv ? `<button type="button" class="btn-primary" data-action="modal-advance" data-order-id="${escapeHtml(o.id)}" data-current-status="${escapeHtml(rawStatus || o.orderStatus)}">→ Mark as ${escapeHtml(statusLabel[canAdv] || canAdv)}</button>` : ''}
+    ${rawStatus !== 'CANCELLED' && rawStatus !== 'DELIVERED' ? `<button type="button" class="btn-danger" data-action="modal-cancel" data-order-id="${escapeHtml(o.id)}">Cancel Order</button>` : ''}`;
   document.getElementById('order-modal').classList.remove('hidden');
 }
 
 function closeOrderModal() { document.getElementById('order-modal').classList.add('hidden'); }
 
 async function advanceOrder(id, currentStatus) {
-  const next = statusNext[currentStatus];
+  const norm = (currentStatus || '').toUpperCase();
+  const next = statusNext[norm] || statusNext[currentStatus];
   if (!next) return;
   try {
     await updateDoc(doc(db, 'orders', id), { orderStatus: next, updatedAt: serverTimestamp() });
-    showToast(`Order moved to ${statusLabel[next]}`, 'success');
+    showToast(`Order moved to ${statusLabel[next] || next}`, 'success');
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -511,8 +485,8 @@ function renderMenuTable(items) {
       <td><span class="toggle-available" role="button" tabindex="0" data-action="toggle-availability" data-id="${escapeHtml(m.id)}" data-current="${m.isAvailable ? 'true' : 'false'}" title="Toggle availability">${m.isAvailable ? '✅' : '❌'}</span></td>
       <td>${m.isFeatured ? '⭐' : '—'}</td>
       <td><div class="actions-cell">
-        <button class="action-btn action-edit" data-action="edit-item" data-id="${escapeHtml(m.id)}">Edit</button>
-        <button class="action-btn action-delete" data-action="delete-item" data-id="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">Delete</button>
+        <button type="button" class="action-btn action-edit" data-action="edit-item" data-id="${escapeHtml(m.id)}">Edit</button>
+        <button type="button" class="action-btn action-delete" data-action="delete-item" data-id="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">Delete</button>
       </div></td>
     </tr>`).join('');
 }
@@ -626,9 +600,9 @@ async function loadUsers() {
         <td>${escapeHtml(u.phone||'—')}</td>
         <td><span class="role-badge role-${escapeHtml(u.role||'customer')}">${escapeHtml(u.role||'customer')}</span></td>
         <td style="font-size:0.8rem;color:#888">${fmtDate(u.createdAt)}</td>
-        <td>
-          ${u.role !== 'admin' ? `<button class="action-btn action-edit" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="true">Make Admin</button>` : `<button class="action-btn action-delete" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="false">Revoke Admin</button>`}
-        </td>
+        <td><div class="actions-cell">
+          ${u.role !== 'admin' ? `<button type="button" class="action-btn action-edit" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="true">Make Admin</button>` : `<button type="button" class="action-btn action-delete" data-action="set-admin" data-user-id="${escapeHtml(u.id)}" data-make-admin="false">Revoke Admin</button>`}
+        </div></td>
       </tr>`).join('');
   } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Error: ${escapeHtml(e.message)}</td></tr>`; }
 }
@@ -641,3 +615,25 @@ async function setAdmin(uid, makeAdmin) {
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
+// ===== EXPORT FOR COMPATIBILITY & DIRECT INVOCATION =====
+window.viewOrder = viewOrder;
+window.advanceOrder = advanceOrder;
+window.cancelOrder = cancelOrder;
+window.editItem = editItem;
+window.openDeleteModal = openDeleteModal;
+window.confirmDelete = confirmDelete;
+window.closeDeleteModal = closeDeleteModal;
+window.closeOrderModal = closeOrderModal;
+window.closeMenuModal = closeMenuModal;
+window.openMenuModal = openMenuModal;
+window.toggleAvailable = toggleAvailable;
+window.setAdmin = setAdmin;
+window.loadPage = loadPage;
+window.saveMenuItem = saveMenuItem;
+
+// Initialize listeners immediately as well as on DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initListeners);
+} else {
+  initListeners();
+}
