@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urban Bites — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">🍔</div>
+        <h1>Urban Bites</h1>
+        <p>Admin Panel</p>
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="admin@urbanbites.com" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" />
+      </div>
+      <button id="login-btn" class="btn-primary btn-full">
+        <span id="login-label">Sign In</span>
+        <div id="login-spinner" class="spinner hidden"></div>
+      </button>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">🍔</div>
+        <div>
+          <div class="brand-name">Urban Bites</div>
+          <div class="brand-sub">Admin Console</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+        <a href="#" class="nav-item" data-page="orders"><span class="nav-icon">🛒</span><span>Orders</span><span class="nav-badge hidden" id="active-badge">0</span></a>
+        <a href="#" class="nav-item" data-page="menu"><span class="nav-icon">🍽️</span><span>Menu Items</span></a>
+        <a href="#" class="nav-item" data-page="users"><span class="nav-icon">👥</span><span>Users</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <div class="admin-avatar" id="admin-avatar">A</div>
+          <div><div class="admin-name" id="admin-name">Admin</div><div class="admin-email" id="admin-email"></div></div>
+        </div>
+        <button id="logout-btn" class="logout-btn" title="Logout">⏻</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <!-- DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <div class="page-header">
+          <div><h2 class="page-title">Dashboard</h2><p class="page-subtitle">Overview of your restaurant performance</p></div>
+          <div class="header-date" id="header-date"></div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon red">💰</div><div class="kpi-body"><div class="kpi-label">Total Revenue</div><div class="kpi-value" id="kpi-revenue">₹0</div><div class="kpi-sub">All time</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon blue">📦</div><div class="kpi-body"><div class="kpi-label">Total Orders</div><div class="kpi-value" id="kpi-orders">0</div><div class="kpi-sub">All time</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon green">🚀</div><div class="kpi-body"><div class="kpi-label">Active Orders</div><div class="kpi-value" id="kpi-active">0</div><div class="kpi-sub">Right now</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon amber">🍽️</div><div class="kpi-body"><div class="kpi-label">Menu Items</div><div class="kpi-value" id="kpi-menu">0</div><div class="kpi-sub">Available</div></div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="card">
+            <div class="card-header"><h3>Recent Orders</h3><button class="btn-link" data-page="orders">View all →</button></div>
+            <table class="data-table"><thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody id="recent-orders-body"><tr><td colspan="4" class="table-empty">Loading…</td></tr></tbody></table>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Status Breakdown</h3></div>
+            <div class="status-chart" id="status-chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section id="page-orders" class="page">
+        <div class="page-header">
+          <div><h2 class="page-title">Orders</h2><p class="page-subtitle">Manage and update customer orders</p></div>
+          <select id="order-status-filter" class="select-input">
+            <option value="">All Statuses</option>
+            <option value="PLACED">Placed</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="PREPARING">Preparing</option>
+            <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody id="orders-body"><tr><td colspan="8" class="table-empty">Loading orders…</td></tr></tbody>
+          </table>
+        </div>
+        <div id="order-modal" class="modal hidden">
+          <div class="modal-backdrop" id="order-backdrop"></div>
+          <div class="modal-box">
+            <div class="modal-header"><h3 id="modal-order-title">Order Details</h3><button id="close-order-modal" class="modal-close">✕</button></div>
+            <div id="modal-order-content"></div>
+            <div class="modal-footer"><div id="modal-status-actions"></div><button id="close-order-btn" class="btn-secondary">Close</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MENU -->
+      <section id="page-menu" class="page">
+        <div class="page-header">
+          <div><h2 class="page-title">Menu Management</h2><p class="page-subtitle">Add, edit, and manage menu items</p></div>
+          <button class="btn-primary" id="add-item-btn">+ Add Item</button>
+        </div>
+        <div class="card">
+          <div class="table-toolbar">
+            <input type="text" id="menu-search" class="search-input" placeholder="🔍  Search items…" />
+            <select id="menu-category-filter" class="select-input"><option value="">All Categories</option></select>
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Available</th><th>Featured</th><th>Actions</th></tr></thead>
+            <tbody id="menu-body"><tr><td colspan="7" class="table-empty">Loading menu…</td></tr></tbody>
+          </table>
+        </div>
+        <div id="menu-modal" class="modal hidden">
+          <div class="modal-backdrop" id="menu-backdrop"></div>
+          <div class="modal-box modal-large">
+            <div class="modal-header"><h3 id="menu-modal-title">Add Menu Item</h3><button id="close-menu-modal" class="modal-close">✕</button></div>
+            <form id="menu-form">
+              <div class="form-row">
+                <div class="form-group"><label>Item Name *</label><input type="text" id="item-name" required placeholder="e.g. Classic Burger" /></div>
+                <div class="form-group"><label>Category *</label><input type="text" id="item-category-name" required placeholder="e.g. Burgers" list="category-list" /><datalist id="category-list"></datalist></div>
+              </div>
+              <div class="form-group"><label>Description *</label><textarea id="item-description" required rows="3" placeholder="Describe the item…"></textarea></div>
+              <div class="form-row">
+                <div class="form-group"><label>Price (paise) *</label><input type="number" id="item-price" required min="1" placeholder="19900 = ₹199" /></div>
+                <div class="form-group"><label>Discount Price (paise)</label><input type="number" id="item-discount" min="0" placeholder="0 = no discount" /></div>
+                <div class="form-group"><label>Delivery Time (min)</label><input type="number" id="item-delivery-time" min="5" value="30" /></div>
+              </div>
+              <div class="form-group"><label>Image URL</label><input type="text" id="item-image-url" placeholder="https://…" /></div>
+              <div class="form-row checkboxes">
+                <label class="checkbox-label"><input type="checkbox" id="item-available" checked /> Available</label>
+                <label class="checkbox-label"><input type="checkbox" id="item-featured" /> Featured</label>
+                <label class="checkbox-label"><input type="checkbox" id="item-vegetarian" /> Vegetarian</label>
+              </div>
+              <div id="menu-form-error" class="login-error hidden"></div>
+              <div class="modal-footer">
+                <button type="button" id="cancel-menu-btn" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary" id="menu-save-btn">Save Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div id="delete-modal" class="modal hidden">
+          <div class="modal-backdrop" id="delete-backdrop"></div>
+          <div class="modal-box modal-sm">
+            <div class="modal-header"><h3>Delete Item</h3><button id="close-delete-modal" class="modal-close">✕</button></div>
+            <p style="padding:1rem 1.5rem">Are you sure you want to delete <strong id="delete-item-name"></strong>?</p>
+            <div class="modal-footer"><button id="cancel-delete-btn" class="btn-secondary">Cancel</button><button id="confirm-delete-btn" class="btn-danger">Delete</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- USERS -->
+      <section id="page-users" class="page">
+        <div class="page-header"><div><h2 class="page-title">Users</h2><p class="page-subtitle">View and manage registered users</p></div></div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th><th>Action</th></tr></thead>
+            <tbody id="users-body"><tr><td colspan="6" class="table-empty">Loading users…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
